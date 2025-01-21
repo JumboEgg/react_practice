@@ -39,9 +39,27 @@ io.on('connection', (socket) => {
         io.emit('chat message', msg);
     });
 
+    // client가 callback 함수를 함께 보낸 경우
+    socket.on('request', (arg1, arg2, callback) => {
+        console.log(arg1);
+        console.log(arg2);
+        callback({ // 정상 응답 시 반환할 객체
+            status: 'ok'
+        });
+    });
+
     socket.on('disconnect', () => {
         console.log('user disconnected');
     });
+
+    // room (특정 room에 속한 사용자에게만 전송)
+    socket.join('some room'); // room 합류
+    // room 내부에 broadcast
+    io.to('some room').emit('hello', 'world');
+    // room에 속하지 않은 client에 broadcast
+    io.except('some room').emit('hello', 'world');
+    // room 탈퇴
+    socket.leave('some room');
 });
 
 // 서버가 port 3000을 listen하도록 설정

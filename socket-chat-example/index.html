@@ -39,6 +39,14 @@
             messages.appendChild(item);
             window.scrollTo(0, document.body.scrollHeight);
         });
+
+        // callback function으로 request-response 기본 기능 처리
+        socket.timeout(5000).emit('request', { foo: 'bar' }, 'baz', (err, response) => {
+            if(err) {} // 제한 시간 내 미응답 시 이벤트
+            else {
+                console.log(response.status); // 'ok' (정상 응답)
+            }
+        });
     </script>
 </body>
 </html>
