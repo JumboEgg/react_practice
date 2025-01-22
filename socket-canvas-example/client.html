@@ -49,7 +49,7 @@
     <div>
         <canvas id="myCanvas" class="container"></canvas>
     </div>
-    
+    <ul id="log"></ul>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
@@ -62,7 +62,8 @@
         let ctx = canvas.getContext('2d');
         // 현재 그림을 그리는 중인지 체크
         let drawing = false;
-        // 지우개 모드 확인인
+        // 지우개를 선택했는지 체크
+        let eraser = false;
 
         // 캔버스 크기 설정
         canvas.height = window.innerHeight * 0.8;
@@ -78,79 +79,139 @@
         document.querySelectorAll('.color').forEach(colorElement => {
             colorElement.addEventListener('click', () => {
                 currentColor = colorElement.style.backgroundColor;
+                eraser = false;
             });
         });
 
-        document.getElementById('erase');
-
-
-        // 현재 그려지고 있는 선 정보
-        // let lines = [];
+        let erase = document.getElementById('erase');
+        erase.addEventListener('click', () => {
+            eraser = true;
+        })
 
         /*** 서버에 내 그리기 정보 전송하기 ***/
         // 그리기 기본 설정
         ctx.lineWidth = 2;
-        // ctx.beginPath(); // 마우스 이동 경로 그리기 시작
+        ctx.lineJoin = 'round'; // 선 둥글게 설정
+        ctx.lineCap = 'round';
 
-        // 마우스로 클릭
-        canvas.addEventListener('mousedown', (e) => {
+        // 직전 점 위치
+        let prevX = 0;
+        let prevY = 0;
+
+        function startDrawing(x, y) {
             drawing = true; // 클릭 시 그리기
 
-            // 새로 그리는 중인 선 정보 저장
-            // let newLine = {
-            //     color: currentColor,
-            //     points: [{
-            //         x: e.offsetX,
-            //         y: e.offsetY
-            //     }]
-            // }
+            if (eraser) {
+                socket.emit('message', {
+                    status: 'erase',
+                    x: x,
+                    y: y
+                });
+            } else {
+                prevX = x;
+                prevY = y;
+                socket.emit('message', {
+                    status: 'start', // 그림 시작점
+                    // x: x, // 시작 위치
+                    // y: y
+                });
+            }
+        }
 
+        function continueDrawing(x, y) {
+            if (drawing && !eraser) { // 그림을 그리는 중이라면
+                socket.emit('message', {
+                    status: 'draw', // 그림 그리는 중
+                    color: currentColor,
+                    prevX: prevX,
+                    prevY: prevY,
+                    curX: x, // 현재 위치
+                    curY: y
+                });
+
+                prevX = x;
+                prevY = y;
+            } else if (drawing && eraser) {
+                socket.emit('message', {
+                    status: 'erase',
+                    x: x,
+                    y: y
+                });
+            }
+        }
+
+        function endDrawing(x, y) {
+            drawing = false;
             socket.emit('message', {
-                status: 'start', // 그림 시작점
-                // color: currentColor, // 선택한 색상 전달
-                x: e.offsetX, // 시작 위치
-                y: e.offsetY
+                status: 'end', // 그림 그리기 종료
+                // x: x,
+                // y: y
             });
+        }
+
+        /*** 마우스로 그리기 ***/
+        // 마우스로 클릭
+        canvas.addEventListener('mousedown', (e) => {
+            startDrawing(e.offsetX, e.offsetY);
         });
 
         // 마우스 이동
         canvas.addEventListener('mousemove', (e) => {
-            if (drawing) { // 그림을 그리는 중이라면
-                // 현재 그리는 중인 선 정보 저장
-                // let lastLine = lines[lines.length - 1];
-                // lastLine.points.push({x: e.offsetX, y: e.offsetY});
-                socket.emit('message', {
-                    status: 'draw', // 그림 그리는 중
-                    color: currentColor,
-                    x: e.offsetX, // 현재 위치
-                    y: e.offsetY
-                });
-            }
+            continueDrawing(e.offsetX, e.offsetY);
         });
 
         // 마우스 떼기
         canvas.addEventListener('mouseup', (e) => {
-            drawing = false;
-            socket.emit('message', {
-                status: 'end', // 그림 그리기 종료
-                x: e.offsetX,
-                y: e.offsetY
-            });
+            endDrawing(e.offsetX, e.offsetY);
         });
+
+        /*** 터치로 그리기 ***/
+        // 터치 좌표 구하기
+        function getTouchPos(e) {
+            return {
+                x: e.touches[0].clientX,
+                y: e.touches[0].clientY - 100 + document.documentElement.scrollTop
+            }
+        }
+
+        // 태블릿용 로그
+        let log = document.getElementById('log');
+        function addLog(x, y) {
+            let item = document.createElement('li');
+            item.textContent = `${x} ${y}`
+            log.appendChild(item);
+        }
+
+        // 화면 터치
+        canvas.addEventListener('touchstart', (e) => {
+            // e.preventDefault()
+            let pos = getTouchPos(e);
+            addLog(e.x, e.y);
+            startDrawing(pos.x, pos.y);
+        });
+
+        // 화면 스와이프
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault()
+            let pos = getTouchPos(e);
+            continueDrawing(pos.x, pos.y);
+        });
+
+        // 터치 종료
+        canvas.addEventListener('touchend', (e) => {
+            // e.preventDefault()
+            let pos = getTouchPos(e);
+            endDrawing(pos.x, pos.y);
+        })
 
         /*** 서버가 준 그리기 정보 캔버스에 반영하기 ***/
         // 그림을 그리는 상태인지 확인
         var isTrue = false;
-        let prevX = 0;
-        let prevY = 0;
 
         // 그림 시작점 그리기
         socket.on('start', (data) => {
-            // console.log(data.color);
-            // ctx.strokeStyle = `${data.color}`;
-            // ctx.moveTo(data.x, data.y);
-            prevX = data.x;
-            prevY = data.y;
+            // prevX = data.x;
+            // prevY = data.y;
             isTrue = true;
         });
         // 그림 그리기
@@ -158,23 +219,26 @@
             if (isTrue) {
                 // 선 색상 설정
                 ctx.strokeStyle = data.color;
-                ctx.lineJoin = 'round'; // 선 둥글게 설정
-                ctx.lineCap = 'round';
 
                 // 전 위치에서 현재 위치로 선 연결하기
                 ctx.beginPath();
-                ctx.moveTo(prevX, prevY);
-                ctx.lineTo(data.x, data.y);
+                ctx.moveTo(data.prevX, data.prevY);
+                ctx.lineTo(data.curX, data.curY);
                 ctx.stroke();
 
-                // 선이 끝나는 위치 업데이트
-                prevX = data.x;
-                prevY = data.y;
+                // // 선이 끝나는 위치 업데이트
+                // prevX = data.x;
+                // prevY = data.y;
             }
         });
         // 그림 그리기 종료
         socket.on('end', (data) => {
             isTrue = false;
+        })
+
+        // 지우기
+        socket.on('erase', (data) => {
+            ctx.clearRect(data.x - 10, data.y - 10, 20, 20);
         })
     </script>
 </body>

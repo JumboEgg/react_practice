@@ -36,6 +36,9 @@ io.sockets.on('connection', (socket) => {
                 break;
             case 'end':
                 io.sockets.emit('end', data);
+                break;
+            case 'erase':
+                io.sockets.emit('erase', data);
             default:
                 break;
         }
