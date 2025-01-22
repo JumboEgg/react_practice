@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas Test</title>
+    <link rel="stylesheet" href="client.css" type="text/css">
+    <style>
+        body {
+            margin: 0;
+        }
+        .container {
+            background:  beige;
+        }
+        #colors {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100px;
+            display: flex;
+        }
+        .color {
+            margin: 0;
+            padding: 0;
+            width: 12.5%;
+            height: 100%;
+            cursor: pointer;
+        }
+        #erase {
+            margin: 0;
+            padding: 0;
+            width: 12.5%;
+            height: 100%;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div id="colors">
+        <span id="red" class="color" style="background-color: red;"></span>
+        <span id="orange" class="color" style="background-color: orange;"></span>
+        <span id="yellow" class="color" style="background-color: yellow;"></span>
+        <span id="green" class="color" style="background-color: green;"></span>
+        <span id="blue" class="color" style="background-color: blue;"></span>
+        <span id="purple" class="color" style="background-color: purple;"></span>
+        <span id="black" class="color" style="background-color: black;"></span>
+        <span id="erase" style="background-color: pink;"></span>
+    </div>
+    <div>
+        <canvas id="myCanvas" class="container"></canvas>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        /*** 캔버스 기본 설정 ***/
+        let canvas = document.getElementById('myCanvas');
+        // 캔버스 객체 받아오기
+        // 그리기 영역과 메서드를 보유
+        // 기본적으로 2D, WebGL로 3D 사용 가능
+        let ctx = canvas.getContext('2d');
+        // 현재 그림을 그리는 중인지 체크
+        let drawing = false;
+        // 지우개 모드 확인인
+
+        // 캔버스 크기 설정
+        canvas.height = window.innerHeight * 0.8;
+        canvas.width = window.innerWidth;
+
+        // 팔레트 영역
+        let colors = document.getElementById('colors');
+        colors.height = window.innerHeight * 0.2;
+
+        // 선택한 선 색상
+        let currentColor = "black";
+
+        document.querySelectorAll('.color').forEach(colorElement => {
+            colorElement.addEventListener('click', () => {
+                currentColor = colorElement.style.backgroundColor;
+            });
+        });
+
+        document.getElementById('erase');
+
+
+        // 현재 그려지고 있는 선 정보
+        // let lines = [];
+
+        /*** 서버에 내 그리기 정보 전송하기 ***/
+        // 그리기 기본 설정
+        ctx.lineWidth = 2;
+        // ctx.beginPath(); // 마우스 이동 경로 그리기 시작
+
+        // 마우스로 클릭
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true; // 클릭 시 그리기
+
+            // 새로 그리는 중인 선 정보 저장
+            // let newLine = {
+            //     color: currentColor,
+            //     points: [{
+            //         x: e.offsetX,
+            //         y: e.offsetY
+            //     }]
+            // }
+
+            socket.emit('message', {
+                status: 'start', // 그림 시작점
+                // color: currentColor, // 선택한 색상 전달
+                x: e.offsetX, // 시작 위치
+                y: e.offsetY
+            });
+        });
+
+        // 마우스 이동
+        canvas.addEventListener('mousemove', (e) => {
+            if (drawing) { // 그림을 그리는 중이라면
+                // 현재 그리는 중인 선 정보 저장
+                // let lastLine = lines[lines.length - 1];
+                // lastLine.points.push({x: e.offsetX, y: e.offsetY});
+                socket.emit('message', {
+                    status: 'draw', // 그림 그리는 중
+                    color: currentColor,
+                    x: e.offsetX, // 현재 위치
+                    y: e.offsetY
+                });
+            }
+        });
+
+        // 마우스 떼기
+        canvas.addEventListener('mouseup', (e) => {
+            drawing = false;
+            socket.emit('message', {
+                status: 'end', // 그림 그리기 종료
+                x: e.offsetX,
+                y: e.offsetY
+            });
+        });
+
+        /*** 서버가 준 그리기 정보 캔버스에 반영하기 ***/
+        // 그림을 그리는 상태인지 확인
+        var isTrue = false;
+        let prevX = 0;
+        let prevY = 0;
+
+        // 그림 시작점 그리기
+        socket.on('start', (data) => {
+            // console.log(data.color);
+            // ctx.strokeStyle = `${data.color}`;
+            // ctx.moveTo(data.x, data.y);
+            prevX = data.x;
+            prevY = data.y;
+            isTrue = true;
+        });
+        // 그림 그리기
+        socket.on('draw', (data) => {
+            if (isTrue) {
+                // 선 색상 설정
+                ctx.strokeStyle = data.color;
+                ctx.lineJoin = 'round'; // 선 둥글게 설정
+                ctx.lineCap = 'round';
+
+                // 전 위치에서 현재 위치로 선 연결하기
+                ctx.beginPath();
+                ctx.moveTo(prevX, prevY);
+                ctx.lineTo(data.x, data.y);
+                ctx.stroke();
+
+                // 선이 끝나는 위치 업데이트
+                prevX = data.x;
+                prevY = data.y;
+            }
+        });
+        // 그림 그리기 종료
+        socket.on('end', (data) => {
+            isTrue = false;
+        })
+    </script>
+</body>
+</html>

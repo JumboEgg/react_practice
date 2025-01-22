@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas 색상 선 그리기</title>
+    <style>
+        #colorPicker {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 색상 선택기 -->
+    <input type="color" id="colorPicker" value="#000000">
+    <br>
+
+    <!-- 캔버스 영역 -->
+    <canvas id="myCanvas" width="500" height="500"></canvas>
+
+    <script>
+        // 캔버스와 2D 컨텍스트 설정
+        var canvas = document.getElementById("myCanvas");
+        var ctx = canvas.getContext("2d");
+
+        // 초기 선 색상 설정
+        var currentColor = "#000000";
+
+        // 색상 선택기와 이벤트 핸들러 설정
+        var colorPicker = document.getElementById("colorPicker");
+        colorPicker.addEventListener("input", function() {
+            currentColor = colorPicker.value;
+        });
+
+        // 선 그리기 상태 추적
+        var isDrawing = false;
+        var lastX = 0;
+        var lastY = 0;
+
+        // 마우스 이벤트 핸들러
+        canvas.addEventListener("mousedown", function(e) {
+            isDrawing = true;
+            lastX = e.offsetX;
+            lastY = e.offsetY;
+        });
+
+        canvas.addEventListener("mousemove", function(e) {
+            if (isDrawing) {
+                var currentX = e.offsetX;
+                var currentY = e.offsetY;
+                
+                ctx.strokeStyle = currentColor;  // 선택된 색상으로 선 그리기
+                ctx.lineWidth = 5;  // 선의 두께
+                ctx.lineJoin = "round";  // 선의 끝을 둥글게
+                ctx.lineCap = "round";  // 선의 시작을 둥글게
+                
+                ctx.beginPath();
+                ctx.moveTo(lastX, lastY);  // 이전 점
+                ctx.lineTo(currentX, currentY);  // 현재 점
+                ctx.stroke();
+                
+                lastX = currentX;
+                lastY = currentY;
+            }
+        });
+
+        canvas.addEventListener("mouseup", function() {
+            isDrawing = false;
+        });
+
+        canvas.addEventListener("mouseout", function() {
+            isDrawing = false;
+        });
+    </script>
+
+</body>
+</html>
