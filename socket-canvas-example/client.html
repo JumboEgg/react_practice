@@ -112,8 +112,6 @@
                 prevY = y;
                 socket.emit('message', {
                     status: 'start', // 그림 시작점
-                    // x: x, // 시작 위치
-                    // y: y
                 });
             }
         }
@@ -140,12 +138,10 @@
             }
         }
 
-        function endDrawing(x, y) {
+        function endDrawing() {
             drawing = false;
             socket.emit('message', {
                 status: 'end', // 그림 그리기 종료
-                // x: x,
-                // y: y
             });
         }
 
@@ -160,9 +156,14 @@
             continueDrawing(e.offsetX, e.offsetY);
         });
 
+        // 마우스 벗어남
+        canvas.addEventListener('mouseout', (e) => {
+            endDrawing();
+        })
+
         // 마우스 떼기
         canvas.addEventListener('mouseup', (e) => {
-            endDrawing(e.offsetX, e.offsetY);
+            endDrawing();
         });
 
         /*** 터치로 그리기 ***/
@@ -184,7 +185,6 @@
 
         // 화면 터치
         canvas.addEventListener('touchstart', (e) => {
-            // e.preventDefault()
             let pos = getTouchPos(e);
             addLog(e.x, e.y);
             startDrawing(pos.x, pos.y);
@@ -192,16 +192,21 @@
 
         // 화면 스와이프
         canvas.addEventListener('touchmove', (e) => {
-            e.preventDefault()
+            e.preventDefault();
             let pos = getTouchPos(e);
             continueDrawing(pos.x, pos.y);
         });
 
+        // 터치 벗어남
+        // 태블릿 테스트 필요
+        canvas.addEventListener('touchout', (e) => {
+            e.preventDefault();
+            endDrawing();
+        })
         // 터치 종료
         canvas.addEventListener('touchend', (e) => {
-            // e.preventDefault()
             let pos = getTouchPos(e);
-            endDrawing(pos.x, pos.y);
+            endDrawing();
         })
 
         /*** 서버가 준 그리기 정보 캔버스에 반영하기 ***/
@@ -210,8 +215,6 @@
 
         // 그림 시작점 그리기
         socket.on('start', (data) => {
-            // prevX = data.x;
-            // prevY = data.y;
             isTrue = true;
         });
         // 그림 그리기
@@ -225,10 +228,6 @@
                 ctx.moveTo(data.prevX, data.prevY);
                 ctx.lineTo(data.curX, data.curY);
                 ctx.stroke();
-
-                // // 선이 끝나는 위치 업데이트
-                // prevX = data.x;
-                // prevY = data.y;
             }
         });
         // 그림 그리기 종료
