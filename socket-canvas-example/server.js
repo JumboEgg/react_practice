@@ -21,28 +21,35 @@ app.get('/', (req, res) => {
     res.sendFile(join(__dirname, 'client.html'));
 });
 
+function sendDataToRoom(roomId, data) {
+    io.to(roomId).emit(data['status'], data);
+}
+
 io.sockets.on('connection', (socket) => {
     console.log('client connected');
 
+    // room 입장
+    socket.on('join room', (roomId, name) => {
+        socket.join(roomId);
+        socket.room = roomId;
+        socket.name = name;
+        io.to(roomId).emit('user join', name);
+    });
+
     // 그리기 정보 전달 시 수행
     socket.on('message', (data) => {
-        // 그리기 정보를 연결된 모든 client에 반영한다.
-        switch (data['status']) {
-            case 'start':
-                io.sockets.emit('start', data);
-                break;
-            case 'draw': 
-                io.sockets.emit('draw', data);
-                break;
-            case 'end':
-                io.sockets.emit('end', data);
-                break;
-            case 'erase':
-                io.sockets.emit('erase', data);
-            default:
-                break;
-        }
-    })
+        // 그리기 정보를 room에 전달한다.
+        sendDataToRoom(socket.room, data);
+    });
+
+    // room 퇴장
+    socket.on('leave room', () => {
+        let roomId = socket.room;
+        socket.leave(roomId); // room 연결 종료
+        socket.room = ''; // room 정보 업데이트
+        console.log(`${roomId} -> ${socket.room}`);
+        io.to(roomId).emit('user leave', socket.name);
+    });
 });
 
 const port = 3000;

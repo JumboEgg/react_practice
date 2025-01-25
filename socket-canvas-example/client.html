@@ -10,9 +10,10 @@
             margin: 0;
         }
         .container {
-            background:  beige;
+            background: beige;
         }
         #colors {
+            text-align: right;
             margin: 0;
             padding: 0;
             width: 100%;
@@ -22,21 +23,22 @@
         .color {
             margin: 0;
             padding: 0;
-            width: 12.5%;
+            width: 10%;
             height: 100%;
-            cursor: pointer;
+            /* cursor: pointer; */
         }
         #erase {
             margin: 0;
             padding: 0;
-            width: 12.5%;
+            width: 10%;
             height: 100%;
-            cursor: pointer;
+            /* cursor: pointer; */
         }
     </style>
 </head>
 <body>
     <div id="colors">
+        <button id="exit">나가기</button>
         <span id="red" class="color" style="background-color: red;"></span>
         <span id="orange" class="color" style="background-color: orange;"></span>
         <span id="yellow" class="color" style="background-color: yellow;"></span>
@@ -86,6 +88,28 @@
         let erase = document.getElementById('erase');
         erase.addEventListener('click', () => {
             eraser = true;
+        })
+
+        /** Room 설정 **/
+        // Room 입장
+        let roomId = 'room';
+        let name = 'name'
+        socket.emit('join room', roomId, name);
+
+        // 사용자 입장 알림
+        socket.on('user join', (name) => {
+            alert(`${name}님이 입장하셨습니다.`);
+        });
+
+        // Room 퇴장
+        let exitBtn = document.getElementById('exit');
+        exitBtn.addEventListener('click', () => {
+            socket.emit('leave room');
+        });
+
+        // 사용자 퇴장 알림
+        socket.on('user leave', (name) => {
+            alert(`${name}님이 퇴장하셨습니다.`);
         })
 
         /*** 서버에 내 그리기 정보 전송하기 ***/
