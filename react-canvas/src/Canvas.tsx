@@ -1,74 +1,96 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import Color from "./Color";
 
+const canvasImg = "/src/assets/canvasBackground.png"
 const colors: string[] = ['red', 'orange', 'yellow', 'green', 'blue', 'purple', 'black', 'erase'];
 
-function Color(
-    color: string,
-    setColor: React.Dispatch<React.SetStateAction<string>>,
-    isErasing: boolean,
-    setIsErasing: React.Dispatch<React.SetStateAction<boolean>>
-): JSX.Element {
-
-    if (color === 'erase') {
-        return (
-            <div
-                id='erase'
-                className="color"
-                onClick={() => {setIsErasing(!isErasing)}}
-                style={{flex: 1, background: 'pink'}}
-            ></div>
-        )
-    }
-    return (
-        <div
-            id={color}
-            className="color"
-            onClick={() => {setColor(color)}}
-            style={{flex: 1, background: color}}
-        ></div>
-    )
-}
-
 function Canvas(): JSX.Element {
-    // Canvas DOM 요소에 접근
+    const canvasRatio: number = 1.6;
+    const bgCanvasRef = useRef<HTMLCanvasElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    // Canvas의 context
     const [ctx, setCtx] = useState<CanvasRenderingContext2D>();
-    
-    // 그리는 중인지 확인
+    const [imageData, setImageData] = useState<string | undefined>();
+
     const [isDrawing, setIsDrawing] = useState<boolean>(false);
-    // 선택한 색상
     const [color, setColor] = useState<string>('black');
-    // 지우개 사용 중인지 확인
     const [isErasing, setIsErasing] = useState<boolean>(false);
 
     const palette: JSX.Element[] = [];
 
     colors.map((color) => {
-        palette.push(Color(color, setColor, isErasing, setIsErasing));
+        palette.push(
+            <Color
+                key={color}
+                color={color}
+                setColor={setColor}
+                setIsErasing={setIsErasing}
+            />);
     });
 
     // 캔버스 크기 관리
-    const [windowSize, setWindowSize] =
+    const [canvasSize, setCanvasSize] =
         useState<{width: number, height: number}>(
             {
-                width: window.innerWidth,
-                height: window.innerHeight
+                width: window.innerHeight * canvasRatio * 0.8,
+                height: window.innerHeight * 0.8
             }
         );
 
+    // 캔버스 배경
+    const drawBackgroundImg = useCallback(() => {
+        if (!bgCanvasRef.current) return;
+        const context = bgCanvasRef.current.getContext('2d');
+        if (!context) return;
+
+        const img = new Image();
+        img.src = canvasImg;
+        img.onload = () => {
+            context.drawImage(img, 0, 0, canvasSize.width, canvasSize.height);
+        };
+
+        img.onerror = () => {
+            console.log('failed to load background image');
+        }
+    }, [canvasSize]);
+
     // 화면 크기 변경 시 캔버스 크기 변경
-    // TODO : 화면 크기와 무관하게 비율 고정
     const resizeHandler = useCallback(() => {
-        setWindowSize({width: window.innerWidth, height: window.innerHeight});
+        const newHeight = window.innerHeight * 0.8;
+        const newWidth = newHeight * canvasRatio;
+        setCanvasSize({width: newWidth, height: newHeight});
+
+        if (canvasRef.current) {
+            const context = canvasRef.current.getContext('2d');
+            if (context) {
+                setCtx(context);
+            }
+        }
     }, []);
 
+    // useEffect(() => {
+    //     window.addEventListener('resize', resizeHandler);
+    //     return () => {
+    //         // eventListener를 제거해 중복 이벤트 방지
+    //         window.removeEventListener('resize', resizeHandler);
+    //     }
+    // }, [resizeHandler]);
+
     useEffect(() => {
-        window.addEventListener('resize', resizeHandler);
-        return () => {
-            // eventListener를 제거해 중복 이벤트 방지
-            window.removeEventListener('resize', resizeHandler);
-        }
+        drawBackgroundImg();
+    }, [drawBackgroundImg]);
+
+    // 드로잉 레이어 설정
+    useEffect(() => {
+        if (!canvasRef.current) return;
+        const context = canvasRef.current.getContext('2d');
+        if (!context) return;
+
+        context.strokeStyle = color;
+        context.lineWidth = 10;
+        context.lineJoin = 'round';
+        context.lineCap = 'round';
+
+        setCtx(context);
     })
 
     // Canvas에 focus 설정
@@ -87,6 +109,11 @@ function Canvas(): JSX.Element {
             }
         }
     });
+
+    // 펜 색상 변경
+    useEffect(() => {
+        if (ctx) ctx.strokeStyle = color;
+    }, [color, ctx]);
 
     // 클릭/터치 좌표 계산
     function getPosition(
@@ -129,22 +156,47 @@ function Canvas(): JSX.Element {
         setIsDrawing(false);
     }
 
+    function saveCanvas() {
+        if (!canvasRef.current) return;
+        const currentCanvas = canvasRef.current;
+        if (!currentCanvas) return;
+
+        const dataURL = currentCanvas.toDataURL('image/png');
+        setImageData(dataURL);
+
+        // 로컬에 파일로 저장
+        // const link = document.createElement('a');
+        // link.download = 'image.png';
+    
+        // link.href = dataURL;
+        // document.body.appendChild(link);
+        // link.click();
+        // document.body.removeChild(link);
+    }
+
     return (
         <>
             <div className="palette"
                 style={{
-                    width: windowSize.width * 0.8,
-                    height: windowSize.height * 0.1,
+                    width: canvasSize.width,
+                    height: canvasSize.height * 0.1,
                     display: 'flex',
+                    flexDirection: 'row',
                     margin: 0
                 }}>
                 { palette }
             </div>
-            <div className="canvas">
+            <div className="canvas" style={{position: 'relative', height: canvasSize.height}}>
                 <canvas
-                    width={windowSize.width * 0.8}
-                    height={windowSize.height * 0.8}
-                    style={{margin: 0}}
+                    width={canvasSize.width}
+                    height={canvasSize.height}
+                    style={{position: 'absolute', top: 0, left: 0, zIndex: 0, margin: 0}}
+                    ref={bgCanvasRef}
+                />
+                <canvas
+                    width={canvasSize.width}
+                    height={canvasSize.height}
+                    style={{position: 'absolute', top: 0, left: 0, zIndex: 1, margin: 0}}
                     tabIndex={0}
                     onMouseDown={startDrawing}
                     onMouseMove={draw}
@@ -156,6 +208,14 @@ function Canvas(): JSX.Element {
                     onTouchCancel={endDrawing}
                     ref={canvasRef}
                 ></canvas>
+                <div style={{position: 'absolute', top: '100%'}}>
+                    <div>
+                        <button onClick={saveCanvas}>Save Canvas</button>
+                    </div>
+                    <div>
+                        <img src={imageData}/>
+                    </div>
+                </div>
             </div>
         </>
     )
